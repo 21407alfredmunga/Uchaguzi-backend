@@ -128,6 +128,34 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ---------------------------------------------------------------------------
+# Django REST Framework
+# ---------------------------------------------------------------------------
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'voting_api.authentication.VoterJWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
+    ),
+}
+
+# ---------------------------------------------------------------------------
+# Simple JWT  –  https://django-rest-framework-simplejwt.readthedocs.io/
+# ---------------------------------------------------------------------------
+from datetime import timedelta  # noqa: E402
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    # Must match the Voter model's PK field name.
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'voter_id',
+}
+
 # CORS
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:4200',

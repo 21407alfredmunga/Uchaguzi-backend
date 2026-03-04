@@ -2,7 +2,7 @@ import string
 import secrets
 
 from rest_framework import serializers
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 
 from .models import Voter
 
@@ -45,3 +45,30 @@ class VoterRegistrationSerializer(serializers.ModelSerializer):
         validated_data["password_hash"] = make_password(raw_password)
 
         return super().create(validated_data)
+
+
+# ---------------------------------------------------------------------------
+# Login serializer — validates credentials & returns JWT tokens
+# ---------------------------------------------------------------------------
+class VoterLoginSerializer(serializers.Serializer):
+    """Accept id_number + password, authenticate against the Voter table,
+    and return access / refresh tokens."""
+
+    id_number = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        id_number = attrs["id_number"].strip()
+        password = attrs["password"]
+
+        try:
+            voter = Voter.objects.get(id_number=id_number)
+        except Voter.DoesNotExist:
+            raise serializers.ValidationError("Invalid credentials.")
+
+        if not check_password(password, voter.password_hash):
+            raise serializers.ValidationError("Invalid credentials.")
+
+        # Stash the voter instance so the view can access it.
+        attrs["voter"] = voter
+        return attrs
