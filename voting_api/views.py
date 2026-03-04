@@ -138,31 +138,64 @@ def cast_vote(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def vote_results(request):
-    """Aggregated vote counts per candidate, grouped by seat."""
-    results = (
-        Vote.objects.values(
-            "candidate__id",
-            "candidate__full_name",
-            "candidate__party",
+    """Aggregated vote counts per candidate, with optional filters.
+
+    Query parameters (all optional, combinable):
+        seat_type   – e.g. president, governor, senator, mp, woman_rep, mca
+        county      – e.g. Nairobi
+        constituency – e.g. Westlands
+        ward        – e.g. Kitisuru
+
+    The annotation is done on Candidate → votes (reverse FK), so candidates
+    with zero votes are still included (vote_count = 0).
+    Results are ordered by seat then descending vote count.
+    """
+    qs = Candidate.objects.select_related("seat")
+
+    # ── Optional filters ──────────────────────────────────────────
+    seat_type = request.query_params.get("seat_type")
+    county = request.query_params.get("county")
+    constituency = request.query_params.get("constituency")
+    ward = request.query_params.get("ward")
+
+    if seat_type:
+        qs = qs.filter(seat__seat_type=seat_type)
+    if county:
+        qs = qs.filter(Q(seat__county=county) | Q(seat__level="National"))
+    if constituency:
+        qs = qs.filter(seat__constituency=constituency)
+    if ward:
+        qs = qs.filter(seat__ward=ward)
+
+    # ── Annotate & order ──────────────────────────────────────────
+    qs = (
+        qs.values(
+            "id",
+            "full_name",
+            "party",
+            "photo_url",
             "seat__id",
             "seat__seat_type",
             "seat__name",
+            "seat__level",
         )
-        .annotate(vote_count=Count("id"))
+        .annotate(vote_count=Count("votes"))
         .order_by("seat__id", "-vote_count")
     )
 
     data = [
         {
-            "candidate_id": r["candidate__id"],
-            "candidate_name": r["candidate__full_name"],
-            "party": r["candidate__party"],
+            "candidate_id": r["id"],
+            "candidate_name": r["full_name"],
+            "party": r["party"],
+            "photo_url": r["photo_url"],
             "seat_id": r["seat__id"],
             "seat_type": r["seat__seat_type"],
             "seat_name": r["seat__name"],
+            "seat_level": r["seat__level"],
             "vote_count": r["vote_count"],
         }
-        for r in results
+        for r in qs
     ]
 
     return Response(data)
